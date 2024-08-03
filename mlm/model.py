@@ -1,3 +1,4 @@
+import torch
 import lightning as L
 from torch.optim import AdamW
 from transformers import get_linear_schedule_with_warmup
@@ -15,6 +16,7 @@ class MLMTransformer(L.LightningModule):
         super().__init__()
         self.save_hyperparameters(ignore=['model'])
         self.model = model
+        self.validation_step_outputs = []
 
     def forward(self, **inputs):
         return self.model(**inputs)
@@ -28,8 +30,14 @@ class MLMTransformer(L.LightningModule):
     def validation_step(self, batch, batch_idx):
         outputs = self(**batch)
         loss = outputs['loss']
-        self.log('val/loss', loss, prog_bar=True)
+        self.validation_step_outputs.append({'loss': loss})
         return loss
+    
+    def on_validation_epoch_end(self):
+        outputs = self.validation_step_outputs
+        loss = torch.tensor([x['loss'] for x in outputs], device=self.device).mean()
+        self.log("val/loss", loss, sync_dist=True)
+        self.validation_step_outputs.clear()
 
     def configure_optimizers(self):
         """Prepare optimizer and schedule (linear warmup and decay)"""
