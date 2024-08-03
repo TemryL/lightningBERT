@@ -9,7 +9,8 @@ class MLMTransformer(L.LightningModule):
         self,
         model,
         learning_rate: float = 1e-4,
-        adam_epsilon: float = 1e-8,
+        adamw_epsilon: float = 1e-8,
+        adamw_betas: tuple = (0.9, 0.98),
         warmup_steps: int = 10000,
         weight_decay: float = 0.0
     ):
@@ -53,7 +54,7 @@ class MLMTransformer(L.LightningModule):
                 "weight_decay": 0.0,
             },
         ]
-        optimizer = AdamW(optimizer_grouped_parameters, lr=self.hparams.learning_rate, eps=self.hparams.adam_epsilon)
+        optimizer = AdamW(optimizer_grouped_parameters, lr=self.hparams.learning_rate, eps=self.hparams.adamw_epsilon, betas=self.hparams.adamw_betas)
 
         scheduler = get_linear_schedule_with_warmup(
             optimizer,
