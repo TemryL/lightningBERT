@@ -10,6 +10,7 @@ class SelfAttention(nn.Module):
     def __init__(self, config):
         super().__init__()
         assert config.h_dim % config.n_heads == 0
+        self.config = config
         self.n_heads = config.n_heads
         self.h_dim = config.h_dim
         
@@ -32,6 +33,7 @@ class SelfAttention(nn.Module):
         
         # attention
         if self.flash:
+            mask = mask.unsqueeze(1).unsqueeze(2)
             y = torch.nn.functional.scaled_dot_product_attention(q, k, v, attn_mask=mask.bool(), dropout_p=self.config.dropout if self.training else 0, is_causal=False)
         else:
             att = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.size(-1)))
@@ -98,8 +100,8 @@ class BERT(nn.Module):
         self.config = config
         self.embeddings = nn.ModuleDict(dict(
             token_embeddings = nn.Embedding(config.vocab_size, config.h_dim),
-            segment_embeddings = nn.Embedding(config.n_seg_types, config.h_dim),
-            position_embeddings = nn.Embedding(config.context_size, config.h_dim)
+            position_embeddings = nn.Embedding(config.context_size, config.h_dim),
+            segment_embeddings = nn.Embedding(config.n_seg_types, config.h_dim)
         ))
         self.ln = nn.LayerNorm(config.h_dim, eps=config.ln_eps)
         self.encoder = nn.ModuleDict(dict(
@@ -107,7 +109,21 @@ class BERT(nn.Module):
         ))
         self.dropout = nn.Dropout(config.dropout)
         self.mlm_head = nn.Linear(config.h_dim, config.vocab_size, bias=False)
-        self.embeddings.token_embeddings.weight = self.mlm_head.weight
+        self.embeddings.token_embeddings.weight = self.mlm_head.weight    # Tie weights
+        self.apply(self._init_weights)
+
+    def _init_weights(self, module):
+        if isinstance(module, nn.Linear):
+            module.weight.data.normal_(mean=0.0, std=0.02)
+            if module.bias is not None:
+                module.bias.data.zero_()
+        elif isinstance(module, nn.Embedding):
+            module.weight.data.normal_(mean=0.0, std=0.02)
+            if module.padding_idx is not None:
+                module.weight.data[module.padding_idx].zero_()
+        elif isinstance(module, nn.LayerNorm):
+            module.bias.data.zero_()
+            module.weight.data.fill_(1.0)
     
     def forward(self, input_ids, attention_mask=None, labels=None, seg_ids=None, pos_ids=None):
         device = input_ids.device
