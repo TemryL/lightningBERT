@@ -17,11 +17,10 @@ class GLUETransformer(L.LightningModule):
         num_labels: int,
         task_name: str,
         learning_rate: float = 2e-5,
-        adam_epsilon: float = 1e-8,
+        adamw_epsilon: float = 1e-8,
+        adamw_betas: tuple = (0.9, 0.98),
         warmup_steps: int = 0,
         weight_decay: float = 0.0,
-        train_batch_size: int = 32,
-        eval_batch_size: int = 32,
         eval_splits: Optional[list] = None,
         **kwargs,
     ):
@@ -38,13 +37,13 @@ class GLUETransformer(L.LightningModule):
 
     def training_step(self, batch, batch_idx):
         outputs = self(**batch)
-        loss = outputs[0]
+        loss = outputs['loss']
         self.log("train/loss", loss, prog_bar=True)
         return {"loss": loss}
 
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
         outputs = self(**batch)
-        val_loss, logits = outputs[:2]
+        val_loss, logits = outputs['loss'], outputs['logits']
 
         if self.hparams.num_labels > 1:
             preds = torch.argmax(logits, axis=1)
@@ -94,7 +93,7 @@ class GLUETransformer(L.LightningModule):
                 "weight_decay": 0.0,
             },
         ]
-        optimizer = AdamW(optimizer_grouped_parameters, lr=self.hparams.learning_rate, eps=self.hparams.adam_epsilon)
+        optimizer = AdamW(optimizer_grouped_parameters, lr=self.hparams.learning_rate, eps=self.hparams.adamw_epsilon, betas=self.hparams.adamw_betas)
 
         scheduler = get_linear_schedule_with_warmup(
             optimizer,
