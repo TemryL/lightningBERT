@@ -92,6 +92,13 @@ class BERTConfig:
     h_dim = 768
     ln_eps = 1e-12
     dropout = 0.1
+    
+    def update(self, **kwargs):
+        for key, value in kwargs.items():
+            if hasattr(self, key):
+                setattr(self, key, value)
+            else:
+                raise ValueError(f"Invalid config parameter: {key}")
 
 
 class BERT(nn.Module):
@@ -99,9 +106,9 @@ class BERT(nn.Module):
         super().__init__()
         self.config = config
         self.embeddings = nn.ModuleDict(dict(
-            token_embeddings = nn.Embedding(config.vocab_size, config.h_dim),
-            position_embeddings = nn.Embedding(config.context_size, config.h_dim),
-            segment_embeddings = nn.Embedding(config.n_seg_types, config.h_dim)
+            tok_embeddings = nn.Embedding(config.vocab_size, config.h_dim),
+            seg_embeddings = nn.Embedding(config.n_seg_types, config.h_dim),
+            pos_embeddings = nn.Embedding(config.context_size, config.h_dim),
         ))
         self.ln = nn.LayerNorm(config.h_dim, eps=config.ln_eps)
         self.encoder = nn.ModuleDict(dict(
@@ -109,7 +116,7 @@ class BERT(nn.Module):
         ))
         self.dropout = nn.Dropout(config.dropout)
         self.mlm_head = nn.Linear(config.h_dim, config.vocab_size, bias=False)
-        self.embeddings.token_embeddings.weight = self.mlm_head.weight    # Tie weights
+        self.embeddings.tok_embeddings.weight = self.mlm_head.weight    # Tie weights
         self.apply(self._init_weights)
 
     def _init_weights(self, module):
@@ -135,9 +142,9 @@ class BERT(nn.Module):
         if pos_ids is None:
             pos_ids = torch.arange(0, L, dtype=torch.long, device=device)
         
-        x = self.embeddings.token_embeddings(input_ids)
-        x += self.embeddings.segment_embeddings(seg_ids)
-        x += self.embeddings.position_embeddings(pos_ids)
+        x = self.embeddings.tok_embeddings(input_ids)
+        x += self.embeddings.seg_embeddings(seg_ids)
+        x += self.embeddings.pos_embeddings(pos_ids)
         x = self.ln(x)
         x = self.dropout(x)
         
@@ -153,12 +160,31 @@ class BERT(nn.Module):
 
         return {'loss': loss, 'logits': logits, 'hidden_states': x}
 
+    @classmethod
+    def from_lightning_checkpoint(cls, ckpt_path):
+        checkpoint = torch.load(ckpt_path, map_location=torch.device('cpu'), weights_only=True)
+        state_dict = checkpoint['state_dict']
+        state_dict = {k.replace('model.', ''): v for k, v in state_dict.items()}
+        
+        hparams = checkpoint.get('hyper_parameters', {})
+        config = BERTConfig()
+        config.update(**hparams.get('bert_config', {}))
+        model = cls(config)
+    
+        model.load_state_dict(state_dict)    
+        return model
 
-class CLSHead(nn.Module):
-    def __init__(self, config, num_labels):
+
+class CLSBERT(nn.Module):
+    def __init__(self, bert, num_labels):
+        super().__init__()
+        config = bert.config
+        self.num_labels = num_labels
+        self.bert = bert
         self.fc = nn.Linear(config.h_dim, num_labels)
         
-    def forward(self, x, labels):
+    def forward(self, input_ids, labels, attention_mask=None, pos_ids=None, token_type_ids=None):
+        x = self.bert(input_ids, attention_mask=attention_mask, pos_ids=pos_ids, seg_ids=token_type_ids)
         x = self.fc(x['hidden_states'][:, 0])
         logits = F.tanh(x)
         
@@ -172,3 +198,9 @@ class CLSHead(nn.Module):
             loss_fct = BCEWithLogitsLoss()
             loss = loss_fct(logits, labels)
         return {'loss': loss, 'logits': logits}
+
+    @classmethod
+    def from_pretrained_bert(cls, ckpt_path, num_labels):
+        bert = BERT.from_lightning_checkpoint(ckpt_path)
+        model = cls(bert, num_labels)
+        return model
