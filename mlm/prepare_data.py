@@ -4,7 +4,7 @@ from transformers import AutoTokenizer
 from transformers.utils import logging
 
 
-def chunk_doc(examples, indices, tokenizer, chunk_length=512):
+def chunk_doc(examples, indices, tokenizer, chunk_length):
     chunks = []
     doc_idxs = []
     chunk_idxs = []
@@ -46,7 +46,7 @@ def chunk_doc(examples, indices, tokenizer, chunk_length=512):
 
 
 def main():
-    MAX_LENGTH = 512
+    CHUNK_LENGTH = 128
     TOKENIZER_NAME = 'bert-base-uncased'
 
     # Load the tokenizer
@@ -59,7 +59,7 @@ def main():
     
     # Create the dataset using map function
     tokenized_dataset = dataset.map(
-        lambda examples, indices: chunk_doc(examples, indices, tokenizer, MAX_LENGTH),
+        lambda examples, indices: chunk_doc(examples, indices, tokenizer, CHUNK_LENGTH),
         remove_columns=dataset.column_names,
         batched=True,
         with_indices=True,
@@ -68,7 +68,7 @@ def main():
     )
 
     # Push the dataset to the Hugging Face Hub
-    dataset_name = f"tokenized_wikipedia_20220301.en_train_{MAX_LENGTH}"
+    dataset_name = f"tokenized_wikipedia_20220301.en_train_{CHUNK_LENGTH}"
     tokenized_dataset.push_to_hub(dataset_name, token=os.environ.get("HF_TOKEN"))
     print(f"Dataset pushed to Hugging Face Hub: {dataset_name}")
 
