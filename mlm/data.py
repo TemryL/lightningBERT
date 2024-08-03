@@ -9,9 +9,9 @@ from transformers import BertTokenizer
 
 class WikipediaMLMDataset(Dataset):
     def __init__(self, mlm_probability=0.15):
-        self.data = load_dataset("TemryL/tokenized_wikipedia_20220301.en_train_512", split='train')
+        self.data = load_dataset("TemryL/tokenized_wikipedia_20220301.en_train_128", split='train')
         self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-        self.max_length = 512
+        self.chunk_length = 128
         self.mlm_probability = mlm_probability
 
     def __len__(self):
@@ -21,9 +21,9 @@ class WikipediaMLMDataset(Dataset):
         chunk = self.data[idx]['token_ids']
         attention_mask = self.data[idx]['attention_mask']
         
-        # Ensure the chunk and attention mask is exactly max_length
-        assert len(chunk) == self.max_length
-        assert len(attention_mask) == self.max_length
+        # Ensure the chunk and attention mask is exactly chunk_length
+        assert len(chunk) == self.chunk_length
+        assert len(attention_mask) == self.chunk_length
         
         # Create input_ids and labels for MLM
         input_ids = torch.tensor(chunk)
