@@ -15,7 +15,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--task_name", help="Name of the GLUE task.", type=str, required=True)
     parser.add_argument("--nb_epochs", help="Number of epochs.", type=int, required=True)
-    parser.add_argument("--nb_devices", help="Number of GPUs per node.", type=int, required=True)
+    parser.add_argument("--nb_gpus", help="Number of GPUs per node.", type=int, required=True)
     parser.add_argument("--nb_nodes", help="Number of nodes.", type=int, required=True)
     parser.add_argument("--run_name", help="Name of the run.", type=str, required=True)
     parser.add_argument("--nb_workers", help="Number of workers.", type=int, default=None)
@@ -31,7 +31,7 @@ def main():
     args = parse_args()
     task_name = args.task_name
     nb_epochs = args.nb_epochs
-    nb_devices = args.nb_devices
+    nb_gpus = args.nb_gpus
     nb_nodes = args.nb_nodes
     run_name = args.run_name
     ckpt_path = args.ckpt_path
@@ -69,7 +69,7 @@ def main():
     
     trainer = L.Trainer(
         max_epochs=nb_epochs,
-        devices=nb_devices,
+        devices=nb_gpus,
         num_nodes=nb_nodes,
         log_every_n_steps=10,
         strategy="ddp",
