@@ -1,4 +1,3 @@
-import random
 import torch
 import lightning as L
 from typing import Optional
@@ -27,16 +26,31 @@ class WikipediaMLMDataset(Dataset):
         
         # Create input_ids and labels for MLM
         input_ids = torch.tensor(chunk)
-        attention_mask = torch.tensor(attention_mask)
+        attention_mask = torch.tensor(attention_mask, dtype=torch.bool)
         labels = input_ids.clone()
         
-        # Mask random tokens (only where attention_mask is 1)
-        for i in range(len(input_ids)):
-            if attention_mask[i] == 1 and random.random() < self.mlm_probability:
-                if random.random() < 0.8:
-                    input_ids[i] = self.tokenizer.mask_token_id
-                elif random.random() < 0.5:
-                    input_ids[i] = random.randint(0, self.tokenizer.vocab_size - 1)
+        # Create probability matrix for masking
+        prob_matrix = torch.full(labels.shape, self.mlm_probability)
+        
+        # Don't mask special tokens
+        special_tok_mask = torch.tensor(
+            self.tokenizer.get_special_tokens_mask(input_ids.tolist(), already_has_special_tokens=True),
+            dtype=torch.bool
+        )
+        prob_matrix.masked_fill_(special_tok_mask, value=0.0)
+                
+        # Create mask for tokens to be predicted
+        masked_indices = torch.bernoulli(prob_matrix).bool()
+        labels[~masked_indices] = -100    # only compute loss on masked tokens
+        
+        # 80% of the time, replace masked input tokens with tokenizer.mask_token ([MASK])
+        indices_replaced = torch.bernoulli(torch.full(labels.shape, 0.8)).bool() & masked_indices
+        input_ids[indices_replaced] = self.tokenizer.mask_token_id
+        
+        # 10% of the time, we replace masked input tokens with random token
+        indices_random = torch.bernoulli(torch.full(labels.shape, 0.5)).bool() & masked_indices & ~indices_replaced
+        random_tokens = torch.randint(len(self.tokenizer), labels.shape, dtype=torch.long)
+        input_ids[indices_random] = random_tokens[indices_random]
         
         return {
             'input_ids': input_ids,
