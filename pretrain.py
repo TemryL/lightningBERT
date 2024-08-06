@@ -62,11 +62,6 @@ def main():
     
     # Set callbacks:
     lr_monitor = LearningRateMonitor(logging_interval='step')
-    interval_ckpt = ModelCheckpoint(
-        dirpath = f'ckpts/{run_name}',
-        filename = 'last-{epoch}-{step}',
-        every_n_train_steps = 2000,
-    )
     val_ckpt = ModelCheckpoint(
         dirpath = f'ckpts/{run_name}',
         filename = 'best-{epoch}-{step}',
@@ -74,12 +69,6 @@ def main():
         mode = 'min',
         save_top_k = 1,
         save_on_train_epoch_end = False,
-    )
-    epoch_ckpt = ModelCheckpoint(
-        dirpath = f'ckpts/{run_name}/epochs',
-        filename = '{epoch}',
-        save_on_train_epoch_end = True,
-        save_top_k = -1
     )
 
     # Set logger:
@@ -93,9 +82,10 @@ def main():
         num_nodes = nb_nodes,
         log_every_n_steps = 10,
         val_check_interval = 2000,
+        num_sanity_val_steps = -1,
         strategy = "ddp",
         logger = logger, 
-        callbacks = [lr_monitor, interval_ckpt, val_ckpt, epoch_ckpt],
+        callbacks = [lr_monitor, val_ckpt],
         accelerator = 'gpu' if torch.cuda.is_available() else 'cpu',
         enable_progress_bar = True,
         fast_dev_run = False
