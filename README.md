@@ -8,10 +8,10 @@ python mlm/prepare_data.py
 ## Pretrain on Wikipedia
 ```
 python pretrain.py \
-    --nb_epochs=5 \
+    --nb_epochs=1 \
     --nb_gpus=1 \
     --nb_nodes=1 \
-    --nb_workers=20 \
+    --nb_workers=16 \
     --pin_memory \
     --config='configs/pretrain_cfg.py' \
     --run_name='pretrain_base'
