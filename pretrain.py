@@ -25,6 +25,7 @@ def parse_args():
     
 def main():
     L.seed_everything(42)
+    torch.set_float32_matmul_precision('high')
     
     # Parse arguments:
     args = parse_args()
@@ -82,7 +83,6 @@ def main():
         num_nodes = nb_nodes,
         log_every_n_steps = 10,
         val_check_interval = 2000,
-        num_sanity_val_steps = -1,
         strategy = "ddp",
         logger = logger, 
         callbacks = [lr_monitor, val_ckpt],
