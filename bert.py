@@ -33,8 +33,10 @@ class SelfAttention(nn.Module):
         
         # attention
         if self.flash:
-            mask = mask.unsqueeze(1).unsqueeze(2)
-            y = torch.nn.functional.scaled_dot_product_attention(q, k, v, attn_mask=mask.bool(), dropout_p=self.config.dropout if self.training else 0, is_causal=False)
+            if mask is not None:
+                mask = mask.unsqueeze(1).unsqueeze(2)
+                y = torch.nn.functional.scaled_dot_product_attention(q, k, v, attn_mask=mask.bool(), dropout_p=self.config.dropout if self.training else 0, is_causal=False)
+            y = torch.nn.functional.scaled_dot_product_attention(q, k, v, dropout_p=self.config.dropout if self.training else 0, is_causal=False)
         else:
             att = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.size(-1)))
             if mask is not None:
